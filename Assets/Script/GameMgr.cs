@@ -11,6 +11,7 @@ public class GameMgr : MonoBehaviour
     [SerializeField] private int m_WalkDecrease = 1;
 
     [SerializeField] private Sprite m_VisitedSprite = null;
+    [SerializeField] private Sprite m_OpenedSprite = null;
     [SerializeField] private Sprite m_CanMoveSprite = null;
     [SerializeField] private Sprite m_CantMoveSprite = null;
 
@@ -26,10 +27,16 @@ public class GameMgr : MonoBehaviour
     [SerializeField] private GameObject m_HPStatus = null;
     [SerializeField] private Sprite[] m_HPSprite = null;
 
+    [SerializeField] private GameObject m_FinalStatus = null;
+    [SerializeField] private Sprite m_GameOverSprite = null;
+    [SerializeField] private Sprite m_ClearSprite = null;
+
     private bool m_isOnMove = false;
 
     private int m_CurPlayerX = 0;
     private int m_CurPlayerY = 0;
+
+    private int m_ConditionWeight = 0;
 
     public enum MoveDir
     {
@@ -51,6 +58,8 @@ public class GameMgr : MonoBehaviour
         m_CurPlayerY = 0;
 
         m_isOnMove = false;
+        m_ConditionWeight = 0;
+        JudgeAroundConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
     }
 
     // Update is called once per frame
@@ -79,14 +88,14 @@ public class GameMgr : MonoBehaviour
                                 MovePlayer(MoveDir.DIR_RIGHT);
                                 JudgeVisitedBlock();
                                 SetBlockVisited(m_CurPlayerX, m_CurPlayerY);
-                                JudgeConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
+                                JudgeAroundConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
                             }
                             else if (disX == -1)
                             {
                                 MovePlayer(MoveDir.DIR_LEFT);
                                 JudgeVisitedBlock();
                                 SetBlockVisited(m_CurPlayerX, m_CurPlayerY);
-                                JudgeConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
+                                JudgeAroundConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
                             }
 
                         }
@@ -97,14 +106,14 @@ public class GameMgr : MonoBehaviour
                                 MovePlayer(MoveDir.DIR_DOWN);
                                 JudgeVisitedBlock();
                                 SetBlockVisited(m_CurPlayerX, m_CurPlayerY);
-                                JudgeConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
+                                JudgeAroundConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
                             }
                             else if (disY == -1)
                             {
                                 MovePlayer(MoveDir.DIR_UP);
                                 JudgeVisitedBlock();
                                 SetBlockVisited(m_CurPlayerX, m_CurPlayerY);
-                                JudgeConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
+                                JudgeAroundConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
                             }
                         }
                     }
@@ -131,7 +140,8 @@ public class GameMgr : MonoBehaviour
                 {
                     UpdateHPStatus();
 
-                    JudgeSucOrFail();
+                    if(JudgeSucOrFail())
+                        Invoke("QuitGame", 10.0f);
                 }
             }
         }
@@ -168,7 +178,8 @@ public class GameMgr : MonoBehaviour
         }
 
         m_Player.transform.position = m_Floors[m_CurPlayerY * 4 + m_CurPlayerX].transform.position;
-        m_Floors[m_CurPlayerY * 4 + m_CurPlayerX].GetComponent<SpriteRenderer>().sprite = m_VisitedSprite;
+        m_Floors[m_CurPlayerY * 4 + m_CurPlayerX].GetComponent<SpriteRenderer>().sprite =
+            m_Floors[m_CurPlayerY * 4 + m_CurPlayerX].GetComponent<FloorStatus>().m_isOpened ? m_OpenedSprite : m_VisitedSprite;
     }
 
     public void JudgeVisitedBlock()
@@ -189,30 +200,27 @@ public class GameMgr : MonoBehaviour
     {
         if (!m_Floors[BlockY * 4 + BlockX].GetComponent<FloorStatus>().m_isOpened)
         {
+            m_Floors[BlockY * 4 + BlockX].GetComponent<SpriteRenderer>().sprite = m_OpenedSprite;
             switch (m_Floors[BlockY * 4 + BlockX].GetComponent<FloorStatus>().m_blockCondition)
             {
                 case BlockCondition.MOVE_UP:
                     MovePlayer(MoveDir.DIR_UP);
                     SetBlockVisited(m_CurPlayerX, m_CurPlayerY);
-                    JudgeConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
                     m_MoveStatus.GetComponent<SpriteRenderer>().sprite = m_MoveSprite[(int)MoveDir.DIR_UP];
                     break;
                 case BlockCondition.MOVE_DOWN:
                     MovePlayer(MoveDir.DIR_DOWN);
                     SetBlockVisited(m_CurPlayerX, m_CurPlayerY);
-                    JudgeConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
                     m_MoveStatus.GetComponent<SpriteRenderer>().sprite = m_MoveSprite[(int)MoveDir.DIR_DOWN];
                     break;
                 case BlockCondition.MOVE_LEFT:
                     MovePlayer(MoveDir.DIR_LEFT);
                     SetBlockVisited(m_CurPlayerX, m_CurPlayerY);
-                    JudgeConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
                     m_MoveStatus.GetComponent<SpriteRenderer>().sprite = m_MoveSprite[(int)MoveDir.DIR_LEFT];
                     break;
                 case BlockCondition.MOVE_RIGHT:
                     MovePlayer(MoveDir.DIR_RIGHT);
                     SetBlockVisited(m_CurPlayerX, m_CurPlayerY);
-                    JudgeConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
                     m_MoveStatus.GetComponent<SpriteRenderer>().sprite = m_MoveSprite[(int)MoveDir.DIR_RIGHT];
                     break;
                 case BlockCondition.LIFE_UP:
@@ -225,28 +233,60 @@ public class GameMgr : MonoBehaviour
                     break;
 
             }
-
             m_Floors[BlockY * 4 + BlockX].GetComponent<FloorStatus>().m_isOpened = true;
+            JudgeAroundConditionGoodOrBad(m_CurPlayerX, m_CurPlayerY);
         }
     }
 
     public void JudgeConditionGoodOrBad(int BlockX, int BlockY)
     {
-        switch (m_Floors[BlockY * 4 + BlockX].GetComponent<FloorStatus>().m_blockCondition)
+        if ((BlockX >= 0 && BlockX <= 3) && (BlockY >= 0 && BlockY <= 3))
         {
-            case BlockCondition.NONE:
-            case BlockCondition.MOVE_UP:
-            case BlockCondition.MOVE_DOWN:
-            case BlockCondition.MOVE_LEFT:
-            case BlockCondition.MOVE_RIGHT:
-                m_ConditionStatus.GetComponent<SpriteRenderer>().sprite = m_ConditionSprite[1];
-                break;
-            case BlockCondition.LIFE_UP:
-                m_ConditionStatus.GetComponent<SpriteRenderer>().sprite = m_ConditionSprite[0];
-                break;
-            case BlockCondition.LIFE_DOWN:
-                m_ConditionStatus.GetComponent<SpriteRenderer>().sprite = m_ConditionSprite[2];
-                break;
+            if (!m_Floors[BlockY * 4 + BlockX].GetComponent<FloorStatus>().m_isOpened)
+            {
+                switch (m_Floors[BlockY * 4 + BlockX].GetComponent<FloorStatus>().m_blockCondition)
+                {
+                    case BlockCondition.NONE:
+                    case BlockCondition.MOVE_UP:
+                    case BlockCondition.MOVE_DOWN:
+                    case BlockCondition.MOVE_LEFT:
+                    case BlockCondition.MOVE_RIGHT:
+                        //Nothing to do   
+                        break;
+                    case BlockCondition.LIFE_UP:
+                        m_ConditionWeight++;
+                        break;
+                    case BlockCondition.LIFE_DOWN:
+                        m_ConditionWeight--;
+                        break;
+                }
+            }
+        }
+    }
+
+    public void JudgeAroundConditionGoodOrBad(int BlockX, int BlockY)
+    {
+        m_ConditionWeight = 0;
+
+        for (int x = -1; x <= 1; x++)
+        {
+            for (int y = -1; y <= 1; y++)
+            {
+                JudgeConditionGoodOrBad(BlockX + x, BlockY + y);
+            }
+        }
+
+        if (m_ConditionWeight > 0)
+        {
+            m_ConditionStatus.GetComponent<SpriteRenderer>().sprite = m_ConditionSprite[0];
+        }
+        else if (m_ConditionWeight == 0)
+        {
+            m_ConditionStatus.GetComponent<SpriteRenderer>().sprite = m_ConditionSprite[1];
+        }
+        else if (m_ConditionWeight < 0)
+        {
+            m_ConditionStatus.GetComponent<SpriteRenderer>().sprite = m_ConditionSprite[2];
         }
     }
 
@@ -273,13 +313,13 @@ public class GameMgr : MonoBehaviour
         if (m_PlayerLife < 0)
         {
             //Fail
-
+            m_FinalStatus.GetComponent<SpriteRenderer>().sprite = m_GameOverSprite;
             return true;
         }
         else if (m_CurPlayerX == 3 && m_CurPlayerY == 3)
         {
             //Success
-
+            m_FinalStatus.GetComponent<SpriteRenderer>().sprite = m_ClearSprite;
             return true;
         }
         else
@@ -288,5 +328,10 @@ public class GameMgr : MonoBehaviour
 
             return false;
         }
+    }
+
+    public void QuitGame()
+    {
+        Application.Quit();
     }
 }
